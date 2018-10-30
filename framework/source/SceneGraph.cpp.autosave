@@ -1,0 +1,42 @@
+//
+//  SceneGraph.cpp
+//  
+//
+//  Created by Yen Dang on 25/10/18.
+//
+#include "SceneGraph.hpp"
+#include "Node.cpp"
+#include <vector>
+#include <glm/glm.hpp>
+#include <string>
+
+using namespace std;
+class SceneGraph {
+
+    static SceneGraph* _instance; //one instance
+
+private:
+    std::string name;
+    Node* root;
+    void setName(std::string name_){
+        name = name_;
+    }
+    void setRoot(Node* root_){
+        root = root_;
+    }
+public:   
+    static SceneGraph* getInstance(){  //return instance
+        if(_instance==NULL) //check if this instance is already there or not
+            _instance = new SceneGraph();
+        return _instance;
+    }
+    std::string getName(){
+        return(name);
+    }
+    Node* getRoot(){
+        return(root);
+    }
+
+};
+SceneGraph* SceneGraph::_instance;
+
