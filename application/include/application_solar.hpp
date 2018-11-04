@@ -2,10 +2,29 @@
 #define APPLICATION_SOLAR_HPP
 
 #include "application.hpp"
+
+#include "node.hpp"
+#include "camera_node.hpp"
+#include "geometry_node.hpp"
+#include "scene_graph.hpp"
+
 #include "model.hpp"
 #include "structs.hpp"
+#include <iostream>
+#include <string>
+#include <vector>
 
 // gpu representation of model
+
+
+struct planet {
+    std:: string name;
+    std:: string parent;
+    float size;
+    float speed;
+    float dist;
+};
+
 class ApplicationSolar : public Application {
  public:
   // allocate and initialize objects
@@ -13,17 +32,37 @@ class ApplicationSolar : public Application {
   // free allocated objects
   ~ApplicationSolar();
 
+  SceneGraph* scene_graph = SceneGraph::getInstance();
+  Node* root = scene_graph->getRoot();
+  GeometryNode* root_child;
+
+  planet planets[10] = {
+      {"sun", "root", 0.75, 0, 0},
+      {"mercury", "sun", 0.1, 0.02, 1},
+      {"venus", "sun", 0.2, 0.04, 2},
+      {"earth", "sun", 0.25, 0.06, 3},
+      {"moon", "earth", 0.18, -0.8, 1.5},
+      {"mars", "sun", 0.15, 0.08, 4},
+      {"jupiter", "sun", 0.45, 0.2, 7},
+      {"saturn", "sun", 0.4, 0.2, 9},
+      {"uranus", "sun", 0.35, 0.15, 10},
+      {"neptune", "sun", 0.3, 0.1, 12}
+  };
   // react to key input
   void keyCallback(int key, int action, int mods);
   //handle delta mouse movement input
   void mouseCallback(double pos_x, double pos_y);
   //handle resizing
   void resizeCallback(unsigned width, unsigned height);
-
-  // draw all objects
   void render() const;
+  void init_planet();
+  GeometryNode* init_child(planet a_planet, Node* parent);
+  void add_planet(GeometryNode* a_planet) const;
+  void add_planet_transform(GeometryNode* a_planet) const;
 
  protected:
+  // draw all objects
+
   void initializeShaderPrograms();
   void initializeGeometry();
   // update uniform values
@@ -33,9 +72,10 @@ class ApplicationSolar : public Application {
   // upload view matrix
   void uploadView();
 
+
   // cpu representation of model
   model_object planet_object;
-  
+
   // camera transform matrix
   glm::fmat4 m_view_transform;
   // camera projection matrix
