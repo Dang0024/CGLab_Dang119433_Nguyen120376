@@ -17,13 +17,17 @@ private:
     float size;
     float speed;
     float dist;
+    float color[3];
+    bool print1 = true;
 public:
-    GeometryNode(std::string name_, Node* parent_, float size_, float speed_, float dist_);
+    GeometryNode(std::string name_, Node* parent_, float size_, float speed_, float dist_, float color_[3]);
     model getGeometry();
     void setGeometry(model geo_);
+    void setColor(float color_[3]);
     float getSize();
     float getSpeed();
     float getDist();
+    float* getColor();
 };
 
 

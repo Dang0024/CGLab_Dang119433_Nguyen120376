@@ -31,6 +31,10 @@ ApplicationSolar::ApplicationSolar(std::string const& resource_path)
     initializeShaderPrograms();
     initPlanets(); // ass_1: create scene graph
 
+    // ass_3: add PointLightNode as child of root
+    float light_color[3] = {1.0f, 1.0f, 1.0f};
+    point_light_node = new PointLightNode("point_light", root, 1.0, light_color);
+    root->addChildren(point_light_node);
 }
 
 ApplicationSolar::~ApplicationSolar() {
@@ -44,6 +48,10 @@ ApplicationSolar::~ApplicationSolar() {
 }
 
 void ApplicationSolar::render() const {
+    // ass_3: set background color
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    glClearColor(0.12f, 0.19f, 0.13f, 1.0f);
+
     drawPlanets(root_child);
     drawStars();
 }
@@ -69,7 +77,8 @@ GeometryNode* ApplicationSolar::addPlanet(planet a_planet, Node* parent){
                                             parent,
                                             float(a_planet.size),
                                             float(a_planet.speed),
-                                            float(a_planet.dist));
+                                            float(a_planet.dist),
+                                            a_planet.color);
 
     parent->addChildren(a_node);
     // recursive loop to assign children of the node
@@ -86,9 +95,12 @@ GeometryNode* ApplicationSolar::addPlanet(planet a_planet, Node* parent){
 
 // ass_1: draw all planets
 void ApplicationSolar::drawPlanets(GeometryNode* a_planet) const{
-
+    float* color = a_planet->getColor();
     // bind shader to upload unifomr
     glUseProgram(m_shaders.at("planet").handle);
+
+    // ass_3: set diffuse color for shader
+    glUniform3f(m_shaders.at("planet").u_locs.at("diffuseColor"), *(color + 0), *(color + 1), *(color + 2));
 
     addPlanetTransform(a_planet);
     std::vector<Node*> children = a_planet->getChildrenList();
@@ -127,10 +139,10 @@ void ApplicationSolar::bindAndDrawPlanet(glm::fmat4 model_matrix) const{
 
 
     // extra matrix for normal transformation to keep them orthogonal to surface
-    glm::fmat4 normal_matrix = glm::inverseTranspose(glm::inverse(m_view_transform) * model_matrix);
+    /* glm::fmat4 normal_matrix = glm::inverseTranspose(glm::inverse(m_view_transform) * model_matrix);
     glUniformMatrix4fv(m_shaders.at("planet").u_locs.at("NormalMatrix"),
                        1, GL_FALSE, glm::value_ptr(normal_matrix));
-
+    */
     // bind the VAO to draw
     glBindVertexArray(planet_object.vertex_AO);
 
@@ -140,7 +152,7 @@ void ApplicationSolar::bindAndDrawPlanet(glm::fmat4 model_matrix) const{
 
 // ass2 draw the star
 void ApplicationSolar::drawStars() const{
-    printf("render star\n");
+    // printf("render star\n");
     // bind star shader
     glUseProgram(m_shaders.at("star").handle);
 
@@ -195,6 +207,14 @@ void ApplicationSolar::uploadProjection() {
 
 // update uniform locations
 void ApplicationSolar::uploadUniforms() {
+    // bind planet shader program
+    glUseProgram(m_shaders.at("planet").handle);
+    // ass_3: setting the light source
+    glUniform3f(m_shaders.at("planet").u_locs.at("lightSource"), 0.0f, 0.0f, 0.0f);
+    glUniform1i(m_shaders.at("planet").u_locs.at("shaderSwitch"), 1);
+    glUniform1f(m_shaders.at("planet").u_locs.at("lightIntensity"), point_light_node->getLightIntensity());
+    float* lightColor = point_light_node->getLightColor();
+    glUniform3f(m_shaders.at("planet").u_locs.at("lightColor"), *(lightColor + 0), *(lightColor + 1), *(lightColor + 2));
     uploadView();
     uploadProjection();
 }
@@ -206,10 +226,17 @@ void ApplicationSolar::initializeShaderPrograms() {
     m_shaders.emplace("planet", shader_program{{{GL_VERTEX_SHADER,m_resource_path + "shaders/simple.vert"},
                                                 {GL_FRAGMENT_SHADER, m_resource_path + "shaders/simple.frag"}}});
     // request uniform locations for shader program
-    m_shaders.at("planet").u_locs["NormalMatrix"] = -1;
+    // m_shaders.at("planet").u_locs["NormalMatrix"] = -1;
     m_shaders.at("planet").u_locs["ModelMatrix"] = -1;
     m_shaders.at("planet").u_locs["ViewMatrix"] = -1;
     m_shaders.at("planet").u_locs["ProjectionMatrix"] = -1;
+
+    // ass_3: init variables for shading
+    m_shaders.at("planet").u_locs["lightSource"] = -1;
+    m_shaders.at("planet").u_locs["lightIntensity"] = -1;
+    m_shaders.at("planet").u_locs["lightColor"] = -1;
+    m_shaders.at("planet").u_locs["diffuseColor"] = -1;
+    m_shaders.at("planet").u_locs["shaderSwitch"] = -1;
 
     // ass2_store star shader program objects in container
     m_shaders.emplace("star", shader_program{{{GL_VERTEX_SHADER,m_resource_path + "shaders/star.vert"},
@@ -217,6 +244,7 @@ void ApplicationSolar::initializeShaderPrograms() {
     // ass2_request uniform locations for star shader program
     m_shaders.at("star").u_locs["ViewMatrix"] = -1;
     m_shaders.at("star").u_locs["ProjectionMatrix"] = -1;
+
 }
 
 // load models
@@ -328,6 +356,19 @@ void ApplicationSolar::keyCallback(int key, int action, int mods) {
     }
     else if (key == GLFW_KEY_S  && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
         m_view_transform = glm::translate(m_view_transform, glm::fvec3{0.0f, 0.0f, 0.1f});
+        uploadView();
+    }
+    //ass_3: additional task: input to switch shader mode
+    else if (key == GLFW_KEY_1) {
+        glUseProgram(m_shaders.at("planet").handle);
+        // ass_3: set shaderSwitch for shader
+        glUniform1i(m_shaders.at("planet").u_locs.at("shaderSwitch"),1);
+        uploadView();
+    }
+    else if (key == GLFW_KEY_2) {
+        glUseProgram(m_shaders.at("planet").handle);
+        // ass_3: set shaderSwitch for shader
+        glUniform1i(m_shaders.at("planet").u_locs.at("shaderSwitch"),2);
         uploadView();
     }
 }
