@@ -16,19 +16,22 @@ using namespace gl;
 #include <glm/gtc/matrix_inverse.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/glm.hpp>
+#include "texture_loader.hpp"
 
-const int count_stars = 5000;	// ass_2: pre-define the number of stars
+const int count_stars = 3000;	// ass_2: pre-define the number of stars
 
 ApplicationSolar::ApplicationSolar(std::string const& resource_path)
     :Application{resource_path}
     ,planet_object{} // ass_1
     ,star_object{}  // ass_2
+    ,text_objects{}
     ,m_view_transform{glm::translate(glm::fmat4{}, glm::fvec3{0.0f, 0.0f, 4.0f})}
     ,m_view_projection{utils::calculate_projection_matrix(initial_aspect_ratio)}
 {
     initializeGeometryForPlanets();
     initializeGeometryForStars(); // ass_2
     initializeShaderPrograms();
+    initializeTextures(); //ass_4
     initPlanets(); // ass_1: create scene graph
 
     // ass_3: add PointLightNode as child of root
@@ -45,48 +48,52 @@ ApplicationSolar::~ApplicationSolar() {
     glDeleteBuffers(1, &star_object.vertex_BO);
     glDeleteBuffers(1, &star_object.element_BO);
     glDeleteVertexArrays(1, &star_object.vertex_AO);
+
+    for (int i = 0; i < 11; i++)
+            glDeleteTextures(1, &text_objects[i].handle);
 }
 
 void ApplicationSolar::render() const {
     // ass_3: set background color
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glClearColor(0.12f, 0.19f, 0.13f, 1.0f);
+    // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    // glClearColor(0.12f, 0.19f, 0.13f, 1.0f);
 
     drawPlanets(root_child);
     drawStars();
+    createSky();
 }
 
 // ass_1: initialize all planets
 void ApplicationSolar::initPlanets(){
-
     // find sun and call addPlanet() to create scene graph hierarchical structure
     for(int i=0; i<10; i++){
         planet a_planet = planets[i];
         if(a_planet.parent == "root"){
-            printf("init child %s ... \n", a_planet.name.c_str());
-            root_child = addPlanet(a_planet, root);
+            // printf("init child %s ... \n", a_planet.name.c_str());
+            root_child = addPlanet(a_planet, root, i);
             break;
         }
     }
 
 }
 
-GeometryNode* ApplicationSolar::addPlanet(planet a_planet, Node* parent){
+GeometryNode* ApplicationSolar::addPlanet(planet a_planet, Node* parent, int i){
 
     GeometryNode* a_node = new GeometryNode(a_planet.name,
                                             parent,
                                             float(a_planet.size),
                                             float(a_planet.speed),
                                             float(a_planet.dist),
-                                            a_planet.color);
+                                            a_planet.color,
+                                            i);
 
     parent->addChildren(a_node);
     // recursive loop to assign children of the node
     for(int i=0; i<10; i++){
         planet next_planet = planets[i];
         if(next_planet.parent == a_planet.name){
-            printf("init child %s ... \n", next_planet.name.c_str());
-            addPlanet(next_planet, a_node);
+            // printf("init child %s ... \n", next_planet.name.c_str());
+            addPlanet(next_planet, a_node, i);
         }
     }
 
@@ -96,11 +103,20 @@ GeometryNode* ApplicationSolar::addPlanet(planet a_planet, Node* parent){
 // ass_1: draw all planets
 void ApplicationSolar::drawPlanets(GeometryNode* a_planet) const{
     float* color = a_planet->getColor();
-    // bind shader to upload unifomr
+    // bind shader to upload uniform
     glUseProgram(m_shaders.at("planet").handle);
 
     // ass_3: set diffuse color for shader
-    glUniform3f(m_shaders.at("planet").u_locs.at("diffuseColor"), *(color + 0), *(color + 1), *(color + 2));
+    //glUniform3f(m_shaders.at("planet").u_locs.at("diffuseColor"), *(color + 0), *(color + 1), *(color + 2));
+
+    // ass_4: activate texture Unit
+    glActiveTexture(text_objects[a_planet->getIndex()].target);
+    // ass_4: bind texture
+    glBindTexture(GL_TEXTURE_2D, text_objects[a_planet->getIndex()].handle);
+    // ass_4: location of the sampler uniform for shader
+    int color_sampler_location = glGetUniformLocation(m_shaders.at("planet").handle, "ColorTex");
+    // ass_4: upload index of unit to sampler
+    glUniform1i(color_sampler_location, a_planet->getIndex());
 
     addPlanetTransform(a_planet);
     std::vector<Node*> children = a_planet->getChildrenList();
@@ -143,6 +159,35 @@ void ApplicationSolar::bindAndDrawPlanet(glm::fmat4 model_matrix) const{
     glUniformMatrix4fv(m_shaders.at("planet").u_locs.at("NormalMatrix"),
                        1, GL_FALSE, glm::value_ptr(normal_matrix));
     */
+    // bind the VAO to draw
+    glBindVertexArray(planet_object.vertex_AO);
+
+    // draw bound vertex array using bound shader
+    glDrawElements(planet_object.draw_mode, planet_object.num_elements, model::INDEX.type, NULL);
+}
+
+// ass_4: sky texture mapping
+void ApplicationSolar::createSky() const {
+
+    // bind shader to upload uniforms
+    glUseProgram(m_shaders.at("planet").handle);
+
+    // activate texture Unit
+    glActiveTexture(text_objects[10].target);
+    // bind the proper texture object
+    glBindTexture(GL_TEXTURE_2D, text_objects[10].handle);
+    // location of the sampler uniform for shader
+    int color_sampler_location = glGetUniformLocation(m_shaders.at("planet").handle, "ColorTex");
+    // upload index of unit to sampler
+    glUniform1i(color_sampler_location, 10);
+
+    // get model matrix
+    glm::fmat4 model_matrix = glm::rotate(glm::fmat4{}, float(glfwGetTime() * sky.speed), glm::fvec3{ 0.0f, 1.0f, 0.0f });
+    model_matrix = glm::translate(model_matrix, glm::fvec3{ 0.0f, 0.0f, sky.dist });
+    model_matrix = glm::scale(model_matrix, glm::fvec3{ sky.size, sky.size, sky.size });
+    glUniformMatrix4fv(m_shaders.at("planet").u_locs.at("ModelMatrix"),
+        1, GL_FALSE, glm::value_ptr(model_matrix));
+
     // bind the VAO to draw
     glBindVertexArray(planet_object.vertex_AO);
 
@@ -219,6 +264,41 @@ void ApplicationSolar::uploadUniforms() {
     uploadProjection();
 }
 
+// Texture Specification _ ass4
+ void ApplicationSolar::initializeTextures() {
+
+    // for each planet
+    for (int i = 0; i < 11; i++) {
+
+        std::string file_name;
+        if(i==10){
+          file_name = "sky";
+        }
+        else{
+          file_name = planets[i].name;
+        }
+
+        // load image file
+        pixel_data texData = texture_loader::file(m_resource_path + "textures/" + file_name + ".png");
+
+        text_objects[i].target = GL_TEXTURE0 + i;
+        // activate proper texture unit
+        glActiveTexture(text_objects[i].target);
+        // generate texture
+        glGenTextures(1, &text_objects[i].handle);
+        // bind object
+        glBindTexture(GL_TEXTURE_2D, text_objects[i].handle);
+
+        // set texture filtering options
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        // define texture data and format
+        glTexImage2D(GL_TEXTURE_2D, 0, texData.channels, texData.width, texData.height, 0, texData.channels, GL_UNSIGNED_BYTE, texData.ptr());
+
+    }
+ }
+
 // intialisation functions -------------------------------------------
 // load shader sources
 void ApplicationSolar::initializeShaderPrograms() {
@@ -235,8 +315,9 @@ void ApplicationSolar::initializeShaderPrograms() {
     m_shaders.at("planet").u_locs["lightSource"] = -1;
     m_shaders.at("planet").u_locs["lightIntensity"] = -1;
     m_shaders.at("planet").u_locs["lightColor"] = -1;
-    m_shaders.at("planet").u_locs["diffuseColor"] = -1;
+//  m_shaders.at("planet").u_locs["diffuseColor"] = -1;
     m_shaders.at("planet").u_locs["shaderSwitch"] = -1;
+    m_shaders.at("planet").u_locs["ColorTex"] = -1;	// texture color _ ass4
 
     // ass2_store star shader program objects in container
     m_shaders.emplace("star", shader_program{{{GL_VERTEX_SHADER,m_resource_path + "shaders/star.vert"},
@@ -249,7 +330,7 @@ void ApplicationSolar::initializeShaderPrograms() {
 
 // load models
 void ApplicationSolar::initializeGeometryForPlanets() {
-    model planet_model = model_loader::obj(m_resource_path + "models/sphere.obj", model::NORMAL);
+    model planet_model = model_loader::obj(m_resource_path + "models/sphere.obj", model::NORMAL| model::TEXCOORD);
 
     // generate vertex array object
     glGenVertexArrays(1, &planet_object.vertex_AO);
@@ -271,6 +352,12 @@ void ApplicationSolar::initializeGeometryForPlanets() {
     glEnableVertexAttribArray(1);
     // second attribute is 3 floats with no offset & stride
     glVertexAttribPointer(1, model::NORMAL.components, model::NORMAL.type, GL_FALSE, planet_model.vertex_bytes, planet_model.offsets[model::NORMAL]);
+
+    // Add texture coordinates as attribute _ ass4
+    // activate third attribute on gpu
+    glEnableVertexAttribArray(2);
+    // third attribute is 3 floats with no offset & stride
+    glVertexAttribPointer(2, model::TEXCOORD.components, model::TEXCOORD.type, GL_FALSE, planet_model.vertex_bytes, planet_model.offsets[model::TEXCOORD]);
 
     // generate generic buffer
     glGenBuffers(1, &planet_object.element_BO);

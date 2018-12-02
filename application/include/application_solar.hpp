@@ -53,6 +53,8 @@ public:
         {"neptune", "sun", 0.3, 0.1, 12, {0.69f, 0.81f, 0.93f }}
     };
 
+    planet sky = {"sky", "root", 30, 0, 0, {0.0f, 0.0f, 0.0f}};
+
     // react to key input
     void keyCallback(int key, int action, int mods);
     //handle delta mouse movement input
@@ -63,7 +65,7 @@ public:
 
     // ass_1: initialize all planets
     void initPlanets();
-    GeometryNode* addPlanet(planet a_planet, Node* parent);
+    GeometryNode* addPlanet(planet a_planet, Node* parent, int i);
 
     // ass_1: draw all planets
     void drawPlanets(GeometryNode* a_planet) const;
@@ -73,6 +75,8 @@ public:
     // ass_2: draw stars
     void drawStars() const;
 
+    // ass_4: sky sphere
+    void createSky() const;
 
 protected:
     // draw all objects
@@ -81,6 +85,7 @@ protected:
     void initializeGeometryForPlanets();
     // ass_2: initialise star
     void initializeGeometryForStars();
+    void initializeTextures();
     // update uniform values
     void uploadUniforms();
     // upload projection matrix
@@ -91,6 +96,7 @@ protected:
     // cpu representation of model
     model_object planet_object;
     model_object star_object;
+    texture_object text_objects[11];
 
     // camera transform matrix
     glm::fmat4 m_view_transform;
