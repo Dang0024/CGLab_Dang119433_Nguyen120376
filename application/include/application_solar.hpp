@@ -53,7 +53,7 @@ public:
         {"neptune", "sun", 0.3, 0.1, 12, {0.69f, 0.81f, 0.93f }}
     };
 
-    planet sky = {"sky", "root", 30, 0, 0, {0.0f, 0.0f, 0.0f}};
+    planet sky = {"sky", "root", 3, 0, 0, {0.0f, 0.0f, 0.0f}};
 
     // react to key input
     void keyCallback(int key, int action, int mods);
@@ -85,6 +85,7 @@ protected:
     void initializeGeometryForPlanets();
     // ass_2: initialise star
     void initializeGeometryForStars();
+    void initializeGeometryForSkybox();
     void initializeTextures();
     // update uniform values
     void uploadUniforms();
@@ -96,6 +97,7 @@ protected:
     // cpu representation of model
     model_object planet_object;
     model_object star_object;
+    model_object skybox_object;
     texture_object text_objects[11];
 
     // camera transform matrix

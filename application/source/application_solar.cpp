@@ -24,12 +24,14 @@ ApplicationSolar::ApplicationSolar(std::string const& resource_path)
     :Application{resource_path}
     ,planet_object{} // ass_1
     ,star_object{}  // ass_2
-    ,text_objects{}
+    ,skybox_object{} // ass_4
+    ,text_objects{} // ass_4
     ,m_view_transform{glm::translate(glm::fmat4{}, glm::fvec3{0.0f, 0.0f, 4.0f})}
     ,m_view_projection{utils::calculate_projection_matrix(initial_aspect_ratio)}
 {
     initializeGeometryForPlanets();
     initializeGeometryForStars(); // ass_2
+    initializeGeometryForSkybox();
     initializeShaderPrograms();
     initializeTextures(); //ass_4
     initPlanets(); // ass_1: create scene graph
@@ -104,8 +106,6 @@ GeometryNode* ApplicationSolar::addPlanet(planet a_planet, Node* parent, int i){
 void ApplicationSolar::drawPlanets(GeometryNode* a_planet) const{
     float* color = a_planet->getColor();
     // bind shader to upload uniform
-    glUseProgram(m_shaders.at("planet").handle);
-
     // ass_3: set diffuse color for shader
     //glUniform3f(m_shaders.at("planet").u_locs.at("diffuseColor"), *(color + 0), *(color + 1), *(color + 2));
 
@@ -115,6 +115,7 @@ void ApplicationSolar::drawPlanets(GeometryNode* a_planet) const{
     glBindTexture(GL_TEXTURE_2D, text_objects[a_planet->getIndex()].handle);
     // ass_4: location of the sampler uniform for shader
     int color_sampler_location = glGetUniformLocation(m_shaders.at("planet").handle, "ColorTex");
+    glUseProgram(m_shaders.at("planet").handle);
     // ass_4: upload index of unit to sampler
     glUniform1i(color_sampler_location, a_planet->getIndex());
 
@@ -170,7 +171,7 @@ void ApplicationSolar::bindAndDrawPlanet(glm::fmat4 model_matrix) const{
 void ApplicationSolar::createSky() const {
 
     // bind shader to upload uniforms
-    glUseProgram(m_shaders.at("planet").handle);
+
 
     // activate texture Unit
     glActiveTexture(text_objects[10].target);
@@ -178,6 +179,7 @@ void ApplicationSolar::createSky() const {
     glBindTexture(GL_TEXTURE_2D, text_objects[10].handle);
     // location of the sampler uniform for shader
     int color_sampler_location = glGetUniformLocation(m_shaders.at("planet").handle, "ColorTex");
+    glUseProgram(m_shaders.at("planet").handle);
     // upload index of unit to sampler
     glUniform1i(color_sampler_location, 10);
 
@@ -189,10 +191,9 @@ void ApplicationSolar::createSky() const {
         1, GL_FALSE, glm::value_ptr(model_matrix));
 
     // bind the VAO to draw
-    glBindVertexArray(planet_object.vertex_AO);
-
+    glBindVertexArray(skybox_object.vertex_AO);
     // draw bound vertex array using bound shader
-    glDrawElements(planet_object.draw_mode, planet_object.num_elements, model::INDEX.type, NULL);
+    glDrawElements(skybox_object.draw_mode, skybox_object.num_elements, model::INDEX.type, NULL);
 }
 
 // ass2 draw the star
@@ -289,7 +290,7 @@ void ApplicationSolar::uploadUniforms() {
         // bind object
         glBindTexture(GL_TEXTURE_2D, text_objects[i].handle);
 
-        // set texture filtering options
+        // set texture sampling parameter
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -434,6 +435,51 @@ void ApplicationSolar::initializeGeometryForStars() {
     star_object.num_elements = GLsizei(count_stars);
 }
 
+
+// ass_4 initialise skybox
+void ApplicationSolar::initializeGeometryForSkybox() {
+    model cube_model = model_loader::obj(m_resource_path + "models/skybox.obj", model::NORMAL| model::TEXCOORD);
+
+    // generate vertex array object
+    glGenVertexArrays(1, &skybox_object.vertex_AO);
+    // bind the array for attaching buffers
+    glBindVertexArray(skybox_object.vertex_AO);
+
+    // generate generic buffer
+    glGenBuffers(1, &skybox_object.vertex_BO);
+    // bind this as an vertex array buffer containing all attributes
+    glBindBuffer(GL_ARRAY_BUFFER, skybox_object.vertex_BO);
+    // configure currently bound array buffer
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * cube_model.data.size(), cube_model.data.data(), GL_STATIC_DRAW);
+
+    // activate first attribute on gpu
+    glEnableVertexAttribArray(0);
+    // first attribute is 3 floats with no offset & stride
+    glVertexAttribPointer(0, model::POSITION.components, model::POSITION.type, GL_FALSE, cube_model.vertex_bytes, cube_model.offsets[model::POSITION]);
+    // activate second attribute on gpu
+    glEnableVertexAttribArray(1);
+    // second attribute is 3 floats with no offset & stride
+    glVertexAttribPointer(1, model::NORMAL.components, model::NORMAL.type, GL_FALSE, cube_model.vertex_bytes, cube_model.offsets[model::NORMAL]);
+
+    // Add texture coordinates as attribute _ ass4
+    // activate third attribute on gpu
+    glEnableVertexAttribArray(2);
+    // third attribute is 3 floats with no offset & stride
+    glVertexAttribPointer(2, model::TEXCOORD.components, model::TEXCOORD.type, GL_FALSE, cube_model.vertex_bytes, cube_model.offsets[model::TEXCOORD]);
+
+    // generate generic buffer
+    glGenBuffers(1, &skybox_object.element_BO);
+    // bind this as an vertex array buffer containing all attributes
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, skybox_object.element_BO);
+    // configure currently bound array buffer
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, model::INDEX.size * cube_model.indices.size(), cube_model.indices.data(), GL_STATIC_DRAW);
+
+    // store type of primitive to draw
+    skybox_object.draw_mode = GL_TRIANGLES;
+    // transfer number of indices to model object
+    skybox_object.num_elements = GLsizei(cube_model.indices.size());
+
+}
 // callback functions for window events -----------------------------------
 // handle key input
 void ApplicationSolar::keyCallback(int key, int action, int mods) {
