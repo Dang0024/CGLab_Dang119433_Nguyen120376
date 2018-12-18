@@ -87,6 +87,8 @@ protected:
     void initializeGeometryForStars();
     void initializeGeometryForSkybox();
     void initializeTextures();
+    void initializeFrameBuffer(); //ass_5
+    void initializeScreenQuad(); //ass_5
     // update uniform values
     void uploadUniforms();
     // upload projection matrix
@@ -98,7 +100,11 @@ protected:
     model_object planet_object;
     model_object star_object;
     model_object skybox_object;
-    texture_object text_objects[11];
+    texture_object text_objects[12];
+    model_object screenquad_object;
+
+    GLuint fbo_handle = 0;	// frame buffer object _ ass5
+    GLuint rb_handle = 0;
 
     // camera transform matrix
     glm::fmat4 m_view_transform;
